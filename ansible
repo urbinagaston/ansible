@@ -1,0 +1,436 @@
+ANSIBLE
+
+SECCIÓN 1 
+
+
+1 - INTRODUCCION
+
+Herramienta gratuita de y còdigo abierto que sirve para la automatizaciòn de infraestructuras.
+Servidores, cloud, dispositivos y aplicaciones.
+Servidores: Linux/Windows
+Cloud: AWS. GCP, OpenStack, Vmware
+Dispositivos: Switches y Routers.
+Aplicaciones: Instalar, configurar y administrar servicios.
+
+
+Chef, Puppet, Salt son otras opciones pero la ventaja de Ansible es que no necesita un agente.
+Ansible se conecta por ssh con claves pùblicas y privadas para poder ejecutar las instrucciones necesarias.
+Seguro y fàcil de mantener.
+No requiere saber programar.
+Sintàxis es sencilla.
+
+
+Desventajas:
+-No esta pensado como administrador de versiones. En ese caso se debe utilizar un versionador de software como git.
+-Requiere en grandes entornos configuraciones avanzadas. Aumentar el nùmero de conexiones paralelas y no cerrar sesiòn hasta finalizar la configuraciòn.
+- Se demoran en la correciòn de los bugs.
+
+
+
+2 - INSTALACIÓN
+
+La instalación es muy simple, al ser necesario sólo instalarlo en un nodo y utilizarlo como gestor de paquetes de su distribución.
+
+Requisitos python 2.4
+
+Para Centos o Redhat, se debe configurar el repositorio EPEL: yum install epel-release
+Una vez instalado, ejecutar yum install ansible y luego ansible --version para ver la version.
+
+Centos 7:
+yum install epel-release
+yum search ansible
+yum install ansible
+ansible --version
+
+
+Ubuntu:
+
+apt-get install software-properties-common
+apt-add-repository ppa:ansible/ansible
+apt-get update
+apt-get install ansible
+
+
+Debian
+
+Añadir en /etc/apt/sources.list
+deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main
+apt-key adv --keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
+apt-get update
+apt-get install ansible
+ansible --version
+
+
+También puede ser instalado en Gentoo, FreeBSD, Mac osx, Arch Linux
+
+
+
+
+3 - PRIMEROS PASOS
+
+Lista de elementos a administrar: /etc/ansible/hosts
+Sólo se debe instalar en el servidor, en el cliente no se instala nada.
+Dentro de /etc/ansible tenemos: 
+
+-ansible.cfg: Configuraciones globales a utilizar con ansible.
+-hosts: Servidores a administrar.
+
+Para los primeros ejemplos vamos a añadir en el fichero localhost debajo de:
+## db-[101:101]-node.example.com
+
+localhost ansible_connection=local
+
+
+La conexión para administrar los servidores es por SSH por defecto.
+Si queremos cambiar este comportamiento podemos añadir ansible.connectio:local por si tenemos instalado ansible localmente.
+Para comprobar la conexión con el servidor, en la consola hacemos: ansible (servidor) -m ping
+Debe contestar pong para indicar que se conecta correctamente.
+
+
+Para ejecutar comandos se debe utilizar el modificador -a
+Por ejemplo el comando: ansible localhost -a "hostname"
+Por ejemplo el comando: ansible localhost -a "uptime"
+Si ejecutamos un comando a una ip, por ejemplo: ansible 192.168.110.168 -a "uptime"
+Nos indica que no hay conincidencia y no hay nada para hacer.
+
+Ahora vamos a conectarnos por ssh:
+Para eso vamos a: /etc/ansible
+hacemos: vi hosts
+Agregamos la dirección ip del servidor para poder administrarlo.
+Siempre debajo de ##db-[101:101]-node.example.com
+192.168.110.167
+
+Guardamos y salimos.
+
+Ahora comprobar la conexión con el comando ping: ansible 192.168.110.167 -m ping
+No no podemos conectar porque no tenemos la clave en el servidor.
+
+Generamos la clave en el servidor Centos con el comando: ssh-keygen
+La clave pública generada en:
+Your public key has been saved in /root/.ssh/id_rsa.pub.
+
+scp /root/.ssh/id_rsa.pub urbina@192.168.110.165:/home/urbina
+
+Ahora necesitamos copiar el contenido del fichero id_rsa.pub, que es la clave pública, en el fichero
+authorized_key del servidor a administrar, si no existe el fichero que hace de almacen de claves, 
+lo creamos de la siguiente manera.
+
+mkdir .ssh &&
+chmod 700 .ssh &&
+touch .ssh/authorized_keys &&
+cd .ssh &&
+chmod 600 authorized_keys &&
+cat /home/urbina/id_rsa.pub >> /home/urbina/.ssh/authorized_keys &&
+cd .. &&
+Por último eliminamos el archivo con la clave
+rm id_rsa.pub
+
+
+Se realiza el mismo procedimiento para tanto servidores se quieran administrar.
+La carpeta .ssh y el fichero creados para copiar la clave pública, deben ser creados con el usuario
+que quieran para la conexiòn ssh para que no de error de permisos a la hora de ejecutar tareas
+desde ansible. 
+
+Si tiene más de un servidor a administrar y con diferentes usuarios registrados para ssh, pero quieren
+realizar la misma tarea en todos los servidores, como por ejemplo crear el mismo usuario en todos los servidores,
+se tiene que especificar cada usuario utilizado para la conexión ssh en el /etc/ansuble/hosts
+
+al lado de la dirección ip o el nombre se debe utilizar la variable ansible_user=usuario para configurar
+y así poder ejecutar un comando para todos los servidores, con el comando por ejemplo:
+
+ansible all -m user -a "name=ansi state=present"
+
+Vemos que en los servidores remotos no es posible crear los usuarios porque no somos usuarios root.
+
+Para poder ejecutar los comandos desde ansible utilizando sudo, se deben tener a los usuarios configurados
+en /etc/sudoers para que puedan ejecutar comandos sin la necesidad de colocar la constraseña de root al utilizar sudo.
+
+En /etc/sudoers, se debe colocar lo siguiente, según el usuario que corresponda.
+
+urbina ALL=(ALL) NOPASSWD: ALL
+
+
+
+4 - INVENTARIO ESTÁTICO
+
+
+FORMATO INI, entre corchetes [].
+En el inventario se especifican los equipos a administrar de forma agrupada.
+Por ejemplo:
+
+[Nombre grupo]
+centos
+debian
+rhel
+
+
+Dentro de /etc/ansible en el fichero hosts vamos a crear dos grupos,
+uno para Debian y otro para Rhel, de la siguiente forma:
+
+## db-[99:101]-node.example.com
+
+localhost ansible_connection=local
+192.168.110.167 ansible_user=urbina
+192.168.110.165 ansible_user=urbina
+
+[debian]
+192.168.110.128 ansible_user=urbina
+[rhel]
+192.168.110.165 ansible_user=urbina
+
+
+Luego verificamos el ping por ip o por grupo y debe responder "pong".
+
+
+--Un servidor puedo estar en más de un grupo, por ejemplo, podemos colocar al servidor dentro del grupo [rhel] y colocarlo dentro del grupo [debian] de la siguiente manera:
+
+
+
+[debian]
+192.168.110.128 ansible_user=urbina ansible_become=false
+192.168.110.165 ansible_user=urbina ansible_become=false
+[rhel]
+192.168.110.165 ansible_user=urbina ansible_become=false
+
+guardamos y ejecutamos: ansible debian -m ping y deben responder los dos servidores con "pong".
+
+
+
+
+-- Un grupo puede tener subgrupos y para eso vamos a especificar un nuevo grupo [apt:children]
+y luego abajo agregamos los subgrupos de la siguiente forma:
+
+
+
+[debian]
+192.168.110.128 ansible_user=urbina 
+192.168.110.165 ansible_user=urbina ansible_become=false
+[rhel]
+192.168.110.165 ansible_user=urbina ansible_become=false
+
+[apt:children]
+debian
+rhel
+
+
+-- Se pueden definir parámetros variables a un grupo por ejemplo: [grupo:vars]
+Puede ser para un grupo padre o un grupo normal.
+
+si hacemo un ansible apt -a id 
+Nos muestra con que usuario se están conectando.
+Pero si ahora definimos una variable para el grupo apt de la siguente manera:
+
+
+[debian]
+192.168.110.128 ansible_user=urbina 
+192.168.110.165 ansible_user=urbina ansible_become=false
+[rhel]
+192.168.110.165 ansible_user=urbina ansible_become=false
+
+[apt:children]
+debian
+rhel
+
+[apt:vars]
+ansible_become=true
+
+guardamos y ejecutamos: ansible apt -a id, ahora vemos que el comando se ejecuta con el usuario
+root.
+
+La variable de grupo local tiene mayor preferencia sobre las declaradas en el grupo de variables.
+
+
+
+
+--Es posible separar las variables en ficheros:
+Para poder definir la configuración en formato YAML y no en formato INI.
+
+/etc/ansible/group_vars/grupo
+/etc/ansible/host_vars/servidor
+
+
+Ahora eliminamos la variables definidas tanto para el servidor como para el grupo, dejando el archivo
+hosts de la siguiente manera:
+
+
+[debian]
+192.168.110.128 ansible_user=urbina 
+192.168.110.165 ansible_user=urbina 
+[rhel]
+192.168.110.165 ansible_user=urbina 
+
+[apt:children]
+debian
+rhel
+
+Comprobamos que se ejecuta correctamente el comando ansible apt -a id
+Ahora creamos el directorio dentro de /etc/ansible:
+
+mkdir group_vars
+cd gruop_vars
+echo "ansible_become: True" > apt
+ejecutamos ansible apt -a id y comprobamos que funciona la variable configurada en el fichero.
+
+
+En el caso de querer aplicar una variable a un servidor:
+Dentro de /etc/ansible creamos el siguiente directorio.
+mkdir host_vars
+cd host_vars
+echo "ansible_become: False" > 192.168.110.167
+ejecutamos: ansible apt -a id
+
+y verificamos que uno de los servidores se ejecuta como root y el otro no porque fue definido asi en el host_vars.
+Primero obtiene las variable del grupo y luego busca las variables del host aplicando finalmente las variables del host.
+
+
+
+
+--Patrones: Es posible utilizar la siguiente sintáxsis.
+
+Por ejemplo si tenemos 5 servidores, llamados de la siguiente forma:
+web1
+web2
+web3
+web4
+web5
+
+y definirlos para tenerlos agrupados en una sola línea de la siguiente manera:
+web[1:5]
+
+También se puede utilizar patrones de letra.
+
+
+
+--Seleccionar inventario: Dentro de /etc/ansible el directorio hosts puede ser cambiado de nombre.
+Por ejemplo: DEV, QA PROD, y ejecutar las tareas de una forma más ordenada y evitar confusiones.
+
+Para mostrar un ejemplo: vamos a /etc/ansible
+hacemos mv hosts qa
+y luego ejecutamos: ansible -i qa all -m ping (con -i seleccionamos el inventario a utilizar).
+
+
+
+--Parámetros (Variables)
+ansible_connection ssh o local
+ansible_host para crear alias
+ansible_port
+ansible_user
+ansible_become true or false
+
+
+
+5 - INVENTARIO DINÁMICO
+
+Es posible realizar un inventario dinámico a partir de:
+
+--Nuestro proveedor cloud : AWS, GCP, Azure
+--Entornos propios: Openstack, Ovirt, Openshit
+
+Scritps : htpps://github.com/ansible/ansible
+Tiene un listado amplio de software que se puede ir utilizando
+
+Realiza inventario dinámico de nuestros servidores en AWS por ejemplo, debido a que pueden cambiar de dirección ip.
+Es útil para cuando tenemos muchos servidores.
+
+
+6 - ADHOC
+
+
+Permite realizar acciones de forma simple para comprobar la conexión a los elementos de los inventarios.
+
+La sintáxis es la siguiente:
+
+ansible [opciones] servidores/grupos/all -m [módulos] -a [argumentos]
+
+[opciones] --limit (filtro)
+[opciones] --user (usuario)
+[opciones] --become (usuario)
+[opciones] -f (ejecución en paralelo)
+
+-m [setup] (módulo)
+
+Ejemplo:
+
+ansible -i ./gce.py all -u alberto -a "cat /etc/debian_version"
+
+Los servidores que no sean debian o no reconozcan el comando podemos exceptuarlos con la opción --limit de la siguiente forma:
+
+
+ansible --limit debian -i ./gce.py all -u alberto -a "cat /etc/debian_version"
+
+
+Módulo Setup
+
+ansible -i gec.py all -u alberto -m setup | less (Módulo setup obtiene información de los servidores)
+
+Nos da la información la direción ip, arquitectura, kernel, fehca del servidore, puerta de enlace, distribución, release.
+Se pueden ejecutar tareas automáticas según estos parámetros.
+
+
+Módulo copy
+
+ansible -i ./gce.py all -u alberto -m copy -a "src=/etc/hosts dest=/etc/hosts"
+
+Copia fichero a todos los servidores.
+
+
+Módulo apt/yum
+
+ansible -i ./gce.py all -u alberto -m apt -a "name=vim state=present"
+
+Instala software en varios servidores.
+Para desinstalar software simplemente reemplazamos la palabra present por absent, como muestra en el siguiente ejemplo:
+
+ansible -i ./gce.py all -u alberto -m apt -a "name=vim state=absent"
+
+
+
+-C / -V
+
+
+Con -C va a comprobar si es posible realizar la tarea.
+ansible -i ./gce.py all -u alberto -m apt -C -a "name=vim state=absent"
+
+Con -V muestra información sobre las tareas realizadas.
+ansible -i ./gce.py all -u alberto -v -m apt -a "name=vim state=absent"
+
+
+
+
+
+
+Otros ejemplos:
+
+Por ejemplo, si quisiera apagar todo nuestro cpd, por una avería de luz podría ejecutar un comando rapido en ansible sin utilizar los playbooks.
+
+Sin embargo, para la administración de la configuración y las implementaciones usaremos playbook’.
+
+Otro ejemplo de adhoc seria copiar un fichero.
+
+ansible –i ./vmware.py all –u usuario –m copy –a “src=/etc/hosts dest=/etc/hosts” –become
+
+Esto va a copiar el fichero hosts de la maquina local a todas las máquinas de inventario.
+
+Otro ejemplo es instalar un programa, usando el –m yum (estamos en centos). También vamos a acortar el become con un -b:
+
+ansible –i ./vmware.py all –b –u usuario –m yum –a “name=apache2 state=present”
+
+
+
+
+
+7 - CONFIGURACIÓN
+
+
+
+
+
+
+
+
+
+
+
+
+
+
