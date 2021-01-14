@@ -1,2 +1,2 @@
-apt-get update
-apt-get install ansible
+apt-get update && upgrade -y &&
+apt-get install ansible -y
