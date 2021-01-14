@@ -426,7 +426,7 @@ ansible –i ./vmware.py all –b –u usuario –m yum –a “name=apache2 sta
 
 
 
-
+https://graspingtech.com/install-docker-ansible/
 
 
 
