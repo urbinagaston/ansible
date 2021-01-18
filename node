@@ -1,0 +1,6 @@
+Configurar nodo ansible
+
+sudo -i
+useradd -m -s /bin/bash user
+passwd user
+echo  -e 'provision\tALL=(ALL)\tNOPASSWD:\tALL' > /etc/sudoers.d/user
