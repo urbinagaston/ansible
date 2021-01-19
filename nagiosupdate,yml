@@ -1,0 +1,14 @@
+---
+- name: Actualizar nagios
+  hosts: nagios
+  remote_user: provision
+  become: true
+  tasks:
+  - name: update nagios
+    shell: |
+      /usr/bin/php /etc/nagios/scripts/get_hosts_from_soldef.php
+      /usr/local/nagios/bin/nagios -v /usr/local/nagios/etc/nagios.cfg
+      /usr/local/nagios/bin/nagios -v /etc/nagios/scripts/tmp/nagios/nagios.cfg
+      /bin/cp -f /etc/nagios/scripts/tmp/nagios/servicegroups.cfg /etc/nagios/objectsservicegroups.cfg
+      /bin/cp -R /etc/nagios/scripts/tmp/nagios/nodos/* /etc/nagios/objects/nodos/
+      service nagios restart
