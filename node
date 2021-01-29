@@ -4,3 +4,7 @@ sudo -i
 useradd -m -s /bin/bash user
 passwd user
 echo  -e 'provision\tALL=(ALL)\tNOPASSWD:\tALL' > /etc/sudoers.d/user
+
+
+Ejecutar playbooks localmente
+ansible-playbook -i localhost /home/user/playbooks/docker_ubuntu20.yml
